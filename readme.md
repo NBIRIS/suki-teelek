@@ -1,8 +1,7 @@
 How to deploy
 
-create .env
+create .env example
 
-<!-- example -->
 POSTGRES_USER=suki_admin
 POSTGRES_PASSWORD=suki_password
 POSTGRES_DB=suki_teelek
