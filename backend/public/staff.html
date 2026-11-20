@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suki Teelek - Management Portal</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="dark-theme">
+  <div class="container">
+    <div class="flex-between" style="margin-bottom: 24px;">
+      <div>
+        <h1 class="brand-title">สุกี้ตี๋เล็ก (Suki Teelek) Portal</h1>
+        <p class="text-muted">
+          Logged in as: <strong id="user-display" style="color: #fff;"></strong>
+          (<span id="role-display" class="text-amber"></span>)
+        </p>
+      </div>
+      <button onclick="logout()" class="btn-dark btn-sm">Sign Out</button>
+    </div>
+
+    <!-- Owner-Only Controls -->
+    <div id="owner-section" class="hidden">
+      <!-- 1. Create Staff Account -->
+      <div class="card-dark owner-box">
+        <h2 class="section-title text-amber"> Create Staff  Account</h2>
+        <div class="form-grid-4">
+          <input id="new-username" type="text" placeholder="New Username" />
+          <input id="new-password" type="password" placeholder="Password" />
+          <select id="new-role">
+            <option value="staff">Staff</option>
+          </select>
+          <button onclick="createUser()" class="btn-green">Create Account</button>
+        </div>
+        <div id="users-list" class="flex-wrap"></div>
+      </div>
+
+      <!-- 2. Menu CRUD -->
+      <div class="card-dark owner-box">
+        <h2 class="section-title text-amber">🍲 Menu Management (CRUD)</h2>
+        <div class="form-grid-5">
+          <input id="menu-th" type="text" placeholder="Thai Name" />
+          <input id="menu-en" type="text" placeholder="English Name" />
+          <input id="menu-cat" type="text" placeholder="Category (Meat/Seafood)" />
+          <select id="menu-tier">
+            <option value="STANDARD">STANDARD</option>
+            <option value="PLUS">PLUS</option>
+          </select>
+          <button onclick="saveMenuItem()" id="save-btn" class="btn-amber">Add Item</button>
+        </div>
+        <div id="menu-mgmt-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- Open Table Form -->
+    <div class="card-dark form-row">
+      <input id="table-input" type="text" placeholder="Table Number (e.g. T12)" style="max-width: 240px;" />
+      <button onclick="createSession()" class="btn-red">Open Table & Generate QR</button>
+    </div>
+
+    <h2 class="section-title">Active Dining Tables </h2>
+    <div id="sessions-grid" class="grid-2"></div>
+
+    <h2 class="section-title">Live Kitchen Queue </h2>
+    <div id="orders-grid"></div>
+  </div>
+
+  <script>
+    const openQrSessionIds = new Set();
+
+    function toggleQrDropdown(sessionId) {
+      if (openQrSessionIds.has(sessionId)) {
+        openQrSessionIds.delete(sessionId);
+      } else {
+        openQrSessionIds.add(sessionId);
+      }
+      loadSessions();
+    }
+
+    async function initAuth() {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        window.location.href = '/login';
+        return;
+      }
+      const user = await res.json();
+      document.getElementById('user-display').innerText = user.username;
+      document.getElementById('role-display').innerText = user.role.toUpperCase();
+
+      if (user.role === 'owner') {
+        document.getElementById('owner-section').classList.remove('hidden');
+        loadMenuManagement();
+        loadUsers();
+      }
+      loadData();
+      setInterval(loadData, 4000);
+    }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
+
+    async function loadUsers() {
+      const res = await fetch('/api/owner/users');
+      if (!res.ok) return;
+      const users = await res.json();
+      document.getElementById('users-list').innerHTML = users.map(u => `
+        <span style="background: #1c1917; border: 1px solid #44403c; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem;">
+          ${u.username} <b class="text-amber">(${u.role})</b>
+        </span>
+      `).join('');
+    }
+
+    async function createUser() {
+      const username = document.getElementById('new-username').value.trim();
+      const password = document.getElementById('new-password').value.trim();
+      const role = document.getElementById('new-role').value;
+
+      const res = await fetch('/api/owner/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        return alert(err.error);
+      }
+
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-password').value = '';
+      loadUsers();
+      alert('Account created!');
+    }
+
+    let editingMenuId = null;
+
+    async function loadMenuManagement() {
+      const res = await fetch('/api/menu');
+      const items = await res.json();
+      document.getElementById('menu-mgmt-list').innerHTML = items.map(m => `
+        <div class="flex-between" style="background: #1c1917; padding: 8px 12px; border-radius: 8px; font-size: 0.8rem;">
+          <div>
+            <strong>${m.name_th} (${m.name_en})</strong>
+            <span class="text-muted" style="margin-left: 8px;">[${m.category} - ${m.tier}]</span>
+          </div>
+          <div class="flex-wrap">
+            <button onclick="editMenuItem(${m.id}, '${m.name_th}', '${m.name_en}', '${m.category}', '${m.tier}')" style="background: none; color: #60a5fa; padding: 2px 6px;">Edit</button>
+            <button onclick="deleteMenuItem(${m.id})" style="background: none; color: #f87171; padding: 2px 6px;">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function saveMenuItem() {
+      const name_th = document.getElementById('menu-th').value;
+      const name_en = document.getElementById('menu-en').value;
+      const category = document.getElementById('menu-cat').value;
+      const tier = document.getElementById('menu-tier').value;
+
+      const url = editingMenuId ? `/api/menu/${editingMenuId}` : '/api/menu';
+      const method = editingMenuId ? 'PUT' : 'POST';
+
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name_th, name_en, category, tier })
+      });
+
+      editingMenuId = null;
+      document.getElementById('menu-th').value = '';
+      document.getElementById('menu-en').value = '';
+      document.getElementById('menu-cat').value = '';
+      document.getElementById('save-btn').innerText = 'Add Item';
+      loadMenuManagement();
+    }
+
+    function editMenuItem(id, th, en, cat, tier) {
+      editingMenuId = id;
+      document.getElementById('menu-th').value = th;
+      document.getElementById('menu-en').value = en;
+      document.getElementById('menu-cat').value = cat;
+      document.getElementById('menu-tier').value = tier;
+      document.getElementById('save-btn').innerText = 'Update Item';
+    }
+
+    async function deleteMenuItem(id) {
+      if (!confirm('Delete this menu item?')) return;
+      await fetch(`/api/menu/${id}`, { method: 'DELETE' });
+      loadMenuManagement();
+    }
+
+    async function createSession() {
+      const table_number = document.getElementById('table-input').value.trim();
+      if (!table_number) return alert('Enter table number');
+      const res = await fetch('/api/staff/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_number })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        return alert(err.error || 'Failed to open table');
+      }
+      const s = await res.json();
+      document.getElementById('table-input').value = '';
+      loadData();
+      alert(`Table ${s.table_number} opened!\nOpened: ${s.created_th} น.\nExpires: ${s.expires_th} น.`);
+    }
+
+    function copyOrderLink(url) {
+      navigator.clipboard.writeText(url);
+      alert('Customer order link copied:\n' + url);
+    }
+
+    async function loadSessions() {
+      const res = await fetch('/api/staff/sessions');
+      if (!res.ok) return;
+      const sessions = await res.json();
+      const grid = document.getElementById('sessions-grid');
+
+      if (sessions.length === 0) {
+        grid.innerHTML = '<p class="text-muted">No active sessions.</p>';
+        return;
+      }
+
+      grid.innerHTML = sessions.map(s => {
+        const orderUrl = `${window.location.origin}/order?token=${s.session_token}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(orderUrl)}`;
+        const isQrOpen = openQrSessionIds.has(s.id);
+
+        return `
+          <div class="card-dark" style="margin-bottom: 0;">
+            <div class="flex-between" style="align-items: flex-start;">
+              <div>
+                <div class="flex-wrap" style="margin-bottom: 6px;">
+                  <span class="badge-amber">Table ${s.table_number}</span>
+                  <span class="badge-active">ACTIVE</span>
+                </div>
+                <div class="text-muted">
+                  <p>Opened: <strong style="color: #e7e5e4;">${s.created_th || '-'} น.</strong></p>
+                  <p>Expires: <strong class="text-amber">${s.expires_th || '-'} น.</strong></p>
+                </div>
+              </div>
+
+              <button onclick="toggleQrDropdown(${s.id})" class="btn-amber btn-sm">
+                ${isQrOpen ? 'Hide QR ▲' : 'Show QR ▼'}
+              </button>
+            </div>
+
+            <div class="flex-wrap" style="margin-top: 12px;">
+              <a href="${orderUrl}" target="_blank" class="btn-outline" style="color: #60a5fa;">Open Link</a>
+              <button onclick="copyOrderLink('${orderUrl}')" class="btn-outline">Copy URL</button>
+              <button onclick="closeSession(${s.id})" class="btn-red btn-sm" style="margin-left: auto;">Close Bill</button>
+            </div>
+
+            ${isQrOpen ? `
+              <div class="qr-dropdown">
+                <div class="qr-white-frame">
+                  <img src="${qrUrl}" alt="QR for Table ${s.table_number}" />
+                </div>
+                <p style="font-size: 0.8rem; font-weight: bold; margin-top: 8px;">Scan for Table ${s.table_number}</p>
+                <p class="text-muted" style="word-break: break-all; margin-top: 2px;">${orderUrl}</p>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function closeSession(id) {
+      if (!confirm('End session?')) return;
+      openQrSessionIds.delete(id);
+      await fetch(`/api/staff/sessions/${id}/close`, { method: 'PATCH' });
+      loadData();
+    }
+
+    async function loadKitchenOrders() {
+      const res = await fetch('/api/staff/orders');
+      if (!res.ok) return;
+      const orders = await res.json();
+      document.getElementById('orders-grid').innerHTML = orders.length === 0
+        ? '<p class="text-muted">No kitchen orders.</p>'
+        : orders.map(o => `
+          <div class="card-dark flex-between ${o.status === 'PREPARING' ? 'order-preparing' : 'order-delivered'}">
+            <div>
+              <div>
+                <span class="badge-red" style="margin-right: 6px;">Table ${o.table_number}</span>
+                <strong>${o.name_th} (${o.name_en})</strong>
+                <strong class="text-amber" style="margin-left: 4px;">x${o.quantity}</strong>
+              </div>
+              <p class="text-muted" style="margin-top: 4px;">Ordered at: <strong style="color: #e7e5e4;">${o.ordered_th || '-'} น.</strong></p>
+            </div>
+            <div>
+              ${o.status === 'PREPARING'
+                ? `<button onclick="markDelivered(${o.item_id})" class="btn-green btn-sm">Mark Delivered</button>`
+                : `<span style="color: #4ade80; font-weight: bold; font-size: 0.8rem;">DELIVERED ✓</span>`}
+            </div>
+          </div>
+        `).join('');
+    }
+
+    async function markDelivered(itemId) {
+      await fetch(`/api/staff/order-items/${itemId}/deliver`, { method: 'PATCH' });
+      loadKitchenOrders();
+    }
+
+    function loadData() {
+      loadSessions();
+      loadKitchenOrders();
+    }
+
+    initAuth();
+  </script>
+</body>
+</html>

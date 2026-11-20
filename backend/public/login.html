@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suki Teelek - Staff Login</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="dark-theme" style="padding: 0;">
+  <div class="login-wrapper">
+    <div class="card-dark" style="width: 100%; max-width: 380px; padding: 28px;">
+      <h1 class="brand-title" style="text-align: center; margin-bottom: 20px;">Suki Teelek login</h1>
+
+      <div id="error-msg" class="hidden alert-error" style="font-size: 0.8rem; padding: 8px;"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label class="text-muted" style="display: block; margin-bottom: 4px;">Username</label>
+          <input id="username" type="text" placeholder="owner or staff" />
+        </div>
+        <div>
+          <label class="text-muted" style="display: block; margin-bottom: 4px;">Password</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+        <button onclick="login()" class="btn-red" style="width: 100%; padding: 11px;">Sign In</button>
+      </div>
+
+      <div style="margin-top: 20px; background: #1c1917; padding: 12px; border-radius: 8px; text-align: center;" class="text-muted">
+        <p style="font-weight: bold; color: #e7e5e4; margin-bottom: 4px;">Account for testing:</p>
+        <p>Owner: <span class="text-amber">owner</span> / <span class="text-amber">owner_password</span></p>
+        <p>Staff: <span class="text-amber">staff</span> / <span class="text-amber">staff_password</span></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        const errDiv = document.getElementById('error-msg');
+        errDiv.innerText = err.error;
+        errDiv.classList.remove('hidden');
+        return;
+      }
+
+      window.location.href = '/staff';
+    }
+  </script>
+</body>
+</html>

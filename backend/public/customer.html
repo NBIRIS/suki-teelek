@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suki Teelek - Customer Ordering</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="light-theme">
+  <header class="customer-header flex-between">
+    <div>
+      <h1 style="font-size: 1.15rem; font-weight: 700;">สุกี้ตี๋เล็ก (Suki Teelek)</h1>
+      <p style="font-size: 0.78rem; color: #fecaca;">Table: <strong id="table-label" style="color: #fff;">-</strong></p>
+    </div>
+    <div id="session-timer" style="font-size: 0.75rem; background: #7f1d1d; padding: 4px 10px; border-radius: 8px;">
+      Session Active
+    </div>
+  </header>
+
+  <main class="container-sm">
+    <div id="error-banner" class="hidden alert-error">
+      Session is closed or invalid. Please contact staff.
+    </div>
+
+    <h2 class="section-title-light">Buffet Menu</h2>
+    <div id="menu-list"></div>
+
+    <h2 class="section-title-light">Ordered Items Status</h2>
+    <div id="order-history"></div>
+  </main>
+
+  <div id="cart-bar" class="bottom-cart-bar">
+    <div class="container-sm flex-between" style="padding: 0;">
+      <strong style="font-size: 0.9rem;">Selected: <span id="cart-count">0</span> trays</strong>
+      <button onclick="submitOrder()" class="btn-red">Send to Kitchen</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sessionToken = params.get('token');
+
+    let cart = {};
+    let activeTable = '';
+
+    async function verifySession() {
+      if (!sessionToken) {
+        showError();
+        return;
+      }
+      const res = await fetch(`/api/session/verify/${sessionToken}`);
+      if (!res.ok) {
+        showError();
+        return;
+      }
+      const session = await res.json();
+      activeTable = session.table_number;
+      document.getElementById('table-label').innerText = activeTable;
+      loadMenu();
+      loadHistory();
+      setInterval(loadHistory, 4000);
+    }
+
+    function showError() {
+      document.getElementById('error-banner').classList.remove('hidden');
+      document.getElementById('menu-list').innerHTML = '';
+      document.getElementById('cart-bar').style.display = 'none';
+    }
+
+    async function loadMenu() {
+      const res = await fetch('/api/menu');
+      const items = await res.json();
+      document.getElementById('menu-list').innerHTML = items.map(item => `
+        <div class="card-light">
+          <div>
+            <p style="font-weight: 700; font-size: 0.92rem;">
+              ${item.name_th} <span style="font-weight: 400; font-size: 0.78rem; color: #78716c;">(${item.name_en})</span>
+            </p>
+            <span class="badge-category">${item.category}</span>
+          </div>
+          <div class="flex-wrap">
+            <button onclick="updateCart(${item.id}, -1)" class="btn-circle" style="background: #e7e5e4; color: #1c1917;">-</button>
+            <strong id="qty-${item.id}" style="width: 20px; text-align: center; font-size: 0.9rem;">0</strong>
+            <button onclick="updateCart(${item.id}, 1)" class="btn-circle btn-red">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateCart(id, delta) {
+      cart[id] = Math.max(0, Math.min(10, (cart[id] || 0) + delta));
+      document.getElementById(`qty-${id}`).innerText = cart[id];
+      document.getElementById('cart-count').innerText = Object.values(cart).reduce((a, b) => a + b, 0);
+    }
+
+    async function submitOrder() {
+      const items = Object.entries(cart)
+        .filter(([_, q]) => q > 0)
+        .map(([id, q]) => ({ menu_item_id: Number(id), quantity: q }));
+
+      if (items.length === 0) return alert('Select items first.');
+
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: sessionToken, items })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error);
+        return;
+      }
+
+      cart = {};
+      loadMenu();
+      document.getElementById('cart-count').innerText = '0';
+      loadHistory();
+    }
+
+    async function loadHistory() {
+      const res = await fetch(`/api/orders/session/${sessionToken}`);
+      if (!res.ok) return;
+      const history = await res.json();
+      document.getElementById('order-history').innerHTML = history.map(h => `
+        <div class="card-light">
+          <div>
+            <p style="font-weight: 600; font-size: 0.9rem;">${h.name_th} x${h.quantity}</p>
+            <p style="font-size: 0.75rem; color: #78716c;">${h.ordered_th || '-'} น.</p>
+          </div>
+          <span class="${h.status === 'DELIVERED' ? 'badge-status-delivered' : 'badge-status-preparing'}">
+            ${h.status}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    verifySession();
+  </script>
+</body>
+</html>
