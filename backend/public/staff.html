@@ -23,21 +23,21 @@
     <div id="owner-section" class="hidden">
       <!-- 1. Create Staff Account -->
       <div class="card-dark owner-box">
-        <h2 class="section-title text-amber"> Create Staff  Account</h2>
-        <div class="form-grid-4">
+        <h2 class="section-title text-amber"> Create Staff Account</h2>
+        <div class="form-grid-5" style="margin-bottom: 0;">
           <input id="new-username" type="text" placeholder="New Username" />
           <input id="new-password" type="password" placeholder="Password" />
+          <input id="confirm-password" type="password" placeholder="Confirm Password" />
           <select id="new-role">
             <option value="staff">Staff</option>
           </select>
           <button onclick="createUser()" class="btn-green">Create Account</button>
         </div>
-        <div id="users-list" class="flex-wrap"></div>
       </div>
 
       <!-- 2. Menu CRUD -->
       <div class="card-dark owner-box">
-        <h2 class="section-title text-amber">🍲 Menu Management (CRUD)</h2>
+        <h2 class="section-title text-amber"> Menu Management </h2>
         <div class="form-grid-5">
           <input id="menu-th" type="text" placeholder="Thai Name" />
           <input id="menu-en" type="text" placeholder="English Name" />
@@ -90,7 +90,6 @@
       if (user.role === 'owner') {
         document.getElementById('owner-section').classList.remove('hidden');
         loadMenuManagement();
-        loadUsers();
       }
       loadData();
       setInterval(loadData, 4000);
@@ -101,21 +100,19 @@
       window.location.href = '/login';
     }
 
-    async function loadUsers() {
-      const res = await fetch('/api/owner/users');
-      if (!res.ok) return;
-      const users = await res.json();
-      document.getElementById('users-list').innerHTML = users.map(u => `
-        <span style="background: #1c1917; border: 1px solid #44403c; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem;">
-          ${u.username} <b class="text-amber">(${u.role})</b>
-        </span>
-      `).join('');
-    }
-
     async function createUser() {
       const username = document.getElementById('new-username').value.trim();
       const password = document.getElementById('new-password').value.trim();
+      const confirmPassword = document.getElementById('confirm-password').value.trim();
       const role = document.getElementById('new-role').value;
+
+      if (!username || !password || !confirmPassword) {
+        return alert('Please fill in username, password, and confirm password.');
+      }
+
+      if (password !== confirmPassword) {
+        return alert('Passwords do not match.');
+      }
 
       const res = await fetch('/api/owner/users', {
         method: 'POST',
@@ -130,7 +127,7 @@
 
       document.getElementById('new-username').value = '';
       document.getElementById('new-password').value = '';
-      loadUsers();
+      document.getElementById('confirm-password').value = '';
       alert('Account created!');
     }
 

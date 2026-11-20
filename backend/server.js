@@ -128,13 +128,20 @@ app.get('/api/owner/users', requireAuth, requireOwner, async (req, res) => {
 
 app.post('/api/owner/users', requireAuth, requireOwner, async (req, res) => {
   const { username, password, role } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  // Prevent owners from creating another owner account
+  if (role && role !== 'staff') {
+    return res.status(403).json({ error: 'Owners can only create staff accounts' });
+  }
 
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
-      [username, hash, role || 'staff']
+      `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'staff') RETURNING id, username, role`,
+      [username.trim(), hash]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

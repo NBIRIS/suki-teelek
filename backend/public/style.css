@@ -62,13 +62,39 @@ body.light-theme {
 
 .card-light {
   background-color: #ffffff;
+  border: 1px solid #e7e5e4;
   border-radius: 12px;
   padding: 14px;
   margin-bottom: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.menu-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-item-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.menu-item-en {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #78716c;
+}
+
+.menu-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* Typography */
@@ -182,6 +208,10 @@ button, .btn {
   padding: 0;
   font-size: 1rem;
   font-weight: bold;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Flex & Grid Helpers */

@@ -32,7 +32,7 @@
   <div id="cart-bar" class="bottom-cart-bar">
     <div class="container-sm flex-between" style="padding: 0;">
       <strong style="font-size: 0.9rem;">Selected: <span id="cart-count">0</span> trays</strong>
-      <button onclick="submitOrder()" class="btn-red">Send to Kitchen</button>
+      <button onclick="submitOrder()" class="btn-red">Order</button>
     </div>
   </div>
 
@@ -72,16 +72,16 @@
       const items = await res.json();
       document.getElementById('menu-list').innerHTML = items.map(item => `
         <div class="card-light">
-          <div>
-            <p style="font-weight: 700; font-size: 0.92rem;">
-              ${item.name_th} <span style="font-weight: 400; font-size: 0.78rem; color: #78716c;">(${item.name_en})</span>
+          <div class="menu-item-info">
+            <p class="menu-item-title">
+              ${item.name_th} <span class="menu-item-en">(${item.name_en})</span>
             </p>
-            <span class="badge-category">${item.category}</span>
+            <span class="badge-category" style="margin-top: 4px; display: inline-block;">${item.category}</span>
           </div>
-          <div class="flex-wrap">
-            <button onclick="updateCart(${item.id}, -1)" class="btn-circle" style="background: #e7e5e4; color: #1c1917;">-</button>
-            <strong id="qty-${item.id}" style="width: 20px; text-align: center; font-size: 0.9rem;">0</strong>
-            <button onclick="updateCart(${item.id}, 1)" class="btn-circle btn-red">+</button>
+          <div class="menu-item-controls">
+            <button type="button" onclick="updateCart(${item.id}, -1)" class="btn-circle" style="background: #e7e5e4; color: #1c1917;">-</button>
+            <strong id="qty-${item.id}" style="min-width: 20px; text-align: center; font-size: 0.9rem;">0</strong>
+            <button type="button" onclick="updateCart(${item.id}, 1)" class="btn-circle btn-red">+</button>
           </div>
         </div>
       `).join('');
@@ -124,11 +124,11 @@
       const history = await res.json();
       document.getElementById('order-history').innerHTML = history.map(h => `
         <div class="card-light">
-          <div>
-            <p style="font-weight: 600; font-size: 0.9rem;">${h.name_th} x${h.quantity}</p>
+          <div class="menu-item-info">
+            <p class="menu-item-title">${h.name_th} <span class="menu-item-en">x${h.quantity}</span></p>
             <p style="font-size: 0.75rem; color: #78716c;">${h.ordered_th || '-'} น.</p>
           </div>
-          <span class="${h.status === 'DELIVERED' ? 'badge-status-delivered' : 'badge-status-preparing'}">
+          <span class="${h.status === 'DELIVERED' ? 'badge-status-delivered' : 'badge-status-preparing'}" style="flex-shrink: 0;">
             ${h.status}
           </span>
         </div>
